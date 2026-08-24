@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha Loja - Sistema Acessível</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
+        header { background-color: #2c3e50; color: white; padding: 10px; text-align: center; }
+        nav { display: flex; justify-content: center; background-color: #34495e; }
+        nav button { background-color: inherit; color: white; border: none; padding: 15px; cursor: pointer; font-size: 18px; font-weight: bold;}
+        nav button:hover { background-color: #1abc9c; }
+        .container { padding: 20px; max-width: 900px; margin: auto; }
+        .tab-content { display: none; background: white; padding: 20px; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .active { display: block; }
+        
+        /* Formulários e Tabelas */
+        input, select { padding: 15px; margin: 10px 0; width: 100%; box-sizing: border-box; font-size: 18px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 18px; }
+        table, th, td { border: 1px solid #ddd; }
+        th, td { padding: 15px; text-align: left; vertical-align: middle; }
+        th { background-color: #f2f2f2; }
+        
+        /* Botões Acessíveis */
+        .btn { padding: 15px; margin: 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 20px; font-weight: bold; color: white; }
+        .btn-verde { background-color: #27ae60; width: 100%; }
+        .btn-verde:hover { background-color: #2ecc71; }
+        .btn-vermelho { background-color: #e74c3c; width: 100%; }
+        .btn-vermelho:hover { background-color: #c0392b; }
+        .btn-azul { background-color: #2980b9; }
+        
+        .btn-qtd { background-color: #34495e; color: white; font-size: 24px; padding: 10px 20px; border-radius: 5px; cursor: pointer; border: none; margin: 0 5px;}
+        
+        /* Tela de Vendas Específica */
+        .area-botoes-venda { display: flex; gap: 10px; margin-top: 20px; }
+        #totalVendaDisplay { font-size: 32px; color: #27ae60; text-align: right; font-weight: bold; margin-top: 20px; }
+        
+        /* Modais (Telas Flutuantes) */
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); }
+        .modal-content { background-color: #fefefe; margin: 10% auto; padding: 30px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 10px; text-align: center; }
+        .modal-content h2 { font-size: 28px; }
+        
+        .opcoes-pagamento { display: flex; justify-content: space-around; margin-top: 20px; flex-wrap: wrap; }
+        .btn-pagamento { font-size: 24px; padding: 30px 20px; width: 30%; border-radius: 10px; cursor: pointer; border: none; color: white; margin-bottom: 10px;}
+        .bg-pix { background-color: #00b8d4; }
+        .bg-dinheiro { background-color: #27ae60; }
+        .bg-cartao { background-color: #f39c12; }
+
+        .btn-gigante { font-size: 40px; padding: 30px; width: 45%; border-radius: 15px; cursor: pointer; border: none; color: white;}
+    </style>
+</head>
+<body onload="focarCodigo()">
+
+<header>
+    <h1>Gerenciamento da Loja</h1>
+</header>
+
+<nav>
+    <button onclick="openTab('caixa')">🛒 CAIXA (VENDAS)</button>
+    <button onclick="openTab('estoque')">📦 ESTOQUE</button>
+    <button onclick="openTab('relatorios')">📊 RELATÓRIOS</button>
+</nav>
+
+<div class="container">
+    <!-- ABA CAIXA (VENDAS) -->
+    <div id="caixa" class="tab-content active">
+        <h2>Bipe o Produto:</h2>
+        <input type="text" id="codigoVenda" placeholder="Clique aqui e leia o código de barras..." onkeypress="verificarEnter(event)">
+        
+        <table id="tabelaCarrinho">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th>Valor Un.</th>
+                    <th style="text-align: center;">Quantidade</th>
+                    <th>Total Item</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <div id="totalVendaDisplay">TOTAL: R$ 0.00</div>
+
+        <div class="area-botoes-venda">
+            <button class="btn btn-vermelho" onclick="cancelarVenda()">❌ CANCELAR</button>
+            <button class="btn btn-verde" onclick="abrirModalPagamento()">✅ CONFIRMAR</button>
+        </div>
+    </div>
+
+    <!-- ABA ESTOQUE -->
+    <div id="estoque" class="tab-content">
+        <h2>Cadastrar Produto</h2>
+        <input type="text" id="cadCodigo" placeholder="Código de Barras (ex: 123)">
+        <input type="text" id="cadNome" placeholder="Nome do Produto">
+        <input type="number" id="cadCusto" placeholder="Custo de Compra (R$)" step="0.01">
+        <input type="number" id="cadPreco" placeholder="Preço de Venda (R$)" step="0.01">
+        <input type="date" id="cadValidade" placeholder="Data de Vencimento">
+        <button class="btn btn-azul" onclick="salvarProduto()">Salvar Produto</button>
+
+        <h3>Produtos Cadastrados</h3>
+        <table id="tabelaEstoque">
+            <thead>
+                <tr><th>Código</th><th>Nome</th><th>Preço</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- ABA RELATÓRIOS -->
+    <div id="relatorios" class="tab-content">
+        <h2>Histórico de Vendas</h2>
+        <ul id="listaVendas" style="font-size: 20px;"></ul>
+    </div>
+</div>
+
+<!-- MODAL: FORMA DE PAGAMENTO -->
+<div id="modalPagamento" class="modal">
+    <div class="modal-content">
+        <h2>Já recebeu o pagamento?</h2>
+        <p style="font-size: 24px;">Como o cliente pagou?</p>
+        <div class="opcoes-pagamento">
+            <button class="btn-pagamento bg-pix" onclick="escolherPagamento('PIX')">💠<br>PIX</button>
+            <button class="btn-pagamento bg-dinheiro" onclick="escolherPagamento('DINHEIRO')">💵<br>DINHEIRO</button>
+            <button class="btn-pagamento bg-cartao" onclick="escolherPagamento('CARTÃO')">💳<br>CARTÃO</button>
+        </div>
+        <br>
+        <button class="btn btn-vermelho" onclick="fecharModais()" style="width: 50%;">Voltar</button>
+    </div>
+</div>
+
+<!-- MODAL: CONFIRMAÇÃO FINAL -->
+<div id="modalConfirmacao" class="modal">
+    <div class="modal-content">
+        <h2>Venda Concluída?</h2>
+        <div style="display: flex; justify-content: space-around; margin-top: 30px;">
+            <button class="btn-gigante btn-vermelho" onclick="fecharModais()">❌<br>NÃO</button>
+            <button class="btn-gigante btn-verde" onclick="finalizarVenda()">✅<br>SIM</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let produtos = JSON.parse(localStorage.getItem('produtos')) || [];
+    let vendas = JSON.parse(localStorage.getItem('vendas')) || [];
+    let carrinho = [];
+    let formaPagamentoAtual = "";
+
+    function focarCodigo() {
+        document.getElementById('codigoVenda').focus();
+    }
+
+    function openTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.getElementById(tabName).classList.add('active');
+        atualizarTelas();
+        if(tabName === 'caixa') focarCodigo();
+    }
+
+    // --- ESTOQUE ---
+    function salvarProduto() {
+        let produto = {
+            codigo: document.getElementById('cadCodigo').value,
+            nome: document.getElementById('cadNome').value,
+            custo: parseFloat(document.getElementById('cadCusto').value),
+            preco: parseFloat(document.getElementById('cadPreco').value),
+            validade: document.getElementById('cadValidade').value
+        };
+
+        if(!produto.codigo || !produto.nome) return alert("Código e Nome são obrigatórios!");
+        produtos.push(produto);
+        localStorage.setItem('produtos', JSON.stringify(produtos));
+        
+        document.getElementById('cadCodigo').value = ''; document.getElementById('cadNome').value = '';
+        document.getElementById('cadCusto').value = ''; document.getElementById('cadPreco').value = '';
+        alert("Produto salvo!"); atualizarTelas();
+    }
+
+    // --- CAIXA (VENDAS) ---
+    function verificarEnter(event) {
+        if (event.key === "Enter") adicionarAoCarrinho();
+    }
+
+    function adicionarAoCarrinho() {
+        let codigo = document.getElementById('codigoVenda').value;
+        let produtoEncontrado = produtos.find(p => p.codigo === codigo);
+
+        if(produtoEncontrado) {
+            // Verifica se já tem no carrinho, se tiver soma +1, se não, cria.
+            let itemExistente = carrinho.find(item => item.produto.codigo === codigo);
+            if(itemExistente) {
+                itemExistente.quantidade += 1;
+            } else {
+                carrinho.push({ produto: produtoEncontrado, quantidade: 1 });
+            }
+            atualizarCarrinho();
+        } else {
+            alert("❌ Produto não encontrado!");
+        }
+        document.getElementById('codigoVenda').value = '';
+        focarCodigo();
+    }
+
+    function alterarQuantidade(index, valor) {
+        carrinho[index].quantidade += valor;
+        if(carrinho[index].quantidade <= 0) {
+            carrinho.splice(index, 1); // Remove se zerar
+        }
+        atualizarCarrinho();
+    }
+
+    function atualizarCarrinho() {
+        let tbody = document.querySelector('#tabelaCarrinho tbody');
+        tbody.innerHTML = '';
+        let total = 0;
+
+        carrinho.forEach((item, index) => {
+            let totalItem = item.produto.preco * item.quantidade;
+            total += totalItem;
+            tbody.innerHTML += `<tr>
+                <td style="font-weight: bold;">${item.produto.nome}</td>
+                <td>R$ ${item.produto.preco.toFixed(2)}</td>
+                <td style="text-align: center;">
+                    <button class="btn-qtd" onclick="alterarQuantidade(${index}, -1)">-</button>
+                    <b style="font-size: 24px;">${item.quantidade}</b>
+                    <button class="btn-qtd" onclick="alterarQuantidade(${index}, 1)">+</button>
+                </td>
+                <td style="font-weight: bold;">R$ ${totalItem.toFixed(2)}</td>
+            </tr>`;
+        });
+        document.getElementById('totalVendaDisplay').innerHTML = `TOTAL: R$ ${total.toFixed(2)}`;
+    }
+
+    function cancelarVenda() {
+        carrinho = [];
+        atualizarCarrinho();
+        focarCodigo();
+    }
+
+    // --- MODAIS DE PAGAMENTO ---
+    function abrirModalPagamento() {
+        if(carrinho.length === 0) return alert("❌ O carrinho está vazio!");
+        document.getElementById('modalPagamento').style.display = "block";
+    }
+
+    function escolherPagamento(forma) {
+        formaPagamentoAtual = forma;
+        document.getElementById('modalPagamento').style.display = "none";
+        document.getElementById('modalConfirmacao').style.display = "block";
+    }
+
+    function fecharModais() {
+        document.getElementById('modalPagamento').style.display = "none";
+        document.getElementById('modalConfirmacao').style.display = "none";
+        focarCodigo();
+    }
+
+    function finalizarVenda() {
+        let total = carrinho.reduce((acc, item) => acc + (item.produto.preco * item.quantidade), 0);
+        let novaVenda = { 
+            data: new Date().toLocaleString(), 
+            total: total, 
+            pagamento: formaPagamentoAtual 
+        };
+        
+        vendas.push(novaVenda);
+        localStorage.setItem('vendas', JSON.stringify(vendas));
+        
+        fecharModais();
+        cancelarVenda(); // Limpa a tela
+        atualizarTelas();
+    }
+
+    // --- ATUALIZAÇÕES ---
+    function atualizarTelas() {
+        let tbEstoque = document.querySelector('#tabelaEstoque tbody');
+        tbEstoque.innerHTML = '';
+        produtos.forEach(p => {
+            tbEstoque.innerHTML += `<tr><td>${p.codigo}</td><td>${p.nome}</td><td>R$ ${p.preco.toFixed(2)}</td></tr>`;
+        });
+
+        let listaVendas = document.getElementById('listaVendas');
+        listaVendas.innerHTML = '';
+        vendas.forEach(v => {
+            listaVendas.innerHTML += `<li>${v.data} - Pagou no: <b>${v.pagamento}</b> - Valor: <b>R$ ${v.total.toFixed(2)}</b></li>`;
+        });
+    }
+
+    atualizarTelas();
+</script>
+
+</body>
+</html>
