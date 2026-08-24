@@ -31,9 +31,10 @@
         .foto-produto { width: 50px; height: 50px; background-color: #ddd; display: inline-flex; justify-content: center; align-items: center; border-radius: 5px; font-size: 24px; }
         .input-qtd { width: 60px; text-align: center; font-size: 20px; font-weight: bold; border: 2px solid #ccc; border-radius: 5px; padding: 5px; margin: 0 5px; }
         .btn-remover { background-color: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 18px; font-weight: bold; }
-        .rodape-caixa { background-color: #ecf0f1; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center; }
-        .btn-pgto-caixa { font-size: 20px; padding: 20px; width: 31%; border-radius: 10px; cursor: pointer; border: none; color: white; font-weight: bold; margin-bottom: 10px; }
-       .recibo { text-align: left; background: #fff; padding: 15px; border: 1px dashed #333; font-family: monospace; font-size: 16px; margin-top: 15px; }
+       .rodape-caixa { background-color: #ecf0f1; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center; }
+        .btn-pgto-caixa { font-size: 20px; padding: 20px; width: 48%; border-radius: 10px; cursor: pointer; border: none; color: white; font-weight: bold; margin-bottom: 10px; }
+        
+        .recibo { text-align: left; background: #fff; padding: 15px; border: 1px dashed #333; font-family: monospace; font-size: 16px; margin-top: 15px; }
 
         /* Faz os Modais (Pop-ups) ficarem escondidos até serem chamados */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); }
@@ -64,9 +65,11 @@
             <p style="font-size: 20px; font-weight: bold; margin: 0 0 20px 0; color: #7f8c8d;"><span id="qtdItensDisplay">0</span> Itens na sacola</p>
             
             <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
-                <button class="btn-pgto-caixa bg-pix" onclick="iniciarPagamento('PIX')">💠 PIX</button>
-                <button class="btn-pgto-caixa bg-dinheiro" onclick="iniciarPagamento('DINHEIRO')">💵 DINHEIRO</button>
-                <button class="btn-pgto-caixa bg-cartao" onclick="iniciarPagamento('CARTÃO')">💳 CARTÃO</button>
+            <button class="btn-pgto-caixa bg-pix" onclick="iniciarPagamento('PIX')">💠 PIX</button>
+            <button class="btn-pgto-caixa bg-dinheiro" onclick="iniciarPagamento('DINHEIRO')">💵 DINHEIRO</button>
+            <button class="btn-pgto-caixa bg-cartao" onclick="iniciarPagamento('CRÉDITO')">💳 CRÉDITO</button>
+            <button class="btn-pgto-caixa bg-cartao" onclick="iniciarPagamento('DÉBITO')">💳 DÉBITO</button>
+        </div>
             </div>
             
             <button class="btn btn-vermelho" onclick="cancelarVenda()" style="margin-top: 15px; font-size: 18px;">❌ CANCELAR VENDA</button>
@@ -93,6 +96,26 @@
     </div>
 </div>
 
+<!-- MODAL: PIX -->
+<div id="modalPix" class="modal">
+    <div class="modal-content">
+        <h2>Pagamento via PIX 💠</h2>
+        <p style="font-size: 24px;">Total da Compra: <b>R$ <span id="totalPix">0.00</span></b></p>
+        
+        <div style="margin: 20px auto; padding: 20px; border: 2px dashed #00b8d4; display: inline-block; border-radius: 10px;">
+            <p style="font-size: 18px; color: #7f8c8d; margin: 0 0 10px 0;">[ ESPAÇO PARA O QR CODE ]</p>
+            <img src="https://via.placeholder.com/200?text=QR+CODE+PIX" alt="QR Code Pix" style="width: 200px; height: 200px; border-radius: 5px;">
+        </div>
+        
+        <p style="font-size: 20px;"><b>Chave PIX:</b> sua-chave-aqui@email.com</p>
+
+        <div style="display: flex; justify-content: space-around; margin-top: 30px;">
+            <button class="btn-gigante btn-vermelho" onclick="fecharModais()" style="font-size: 24px; padding: 20px;">❌ CORRIGIR</button>
+            <button class="btn-gigante btn-verde" onclick="abrirConfirmacao('PIX')" style="font-size: 24px; padding: 20px;">✅ AVANÇAR</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: CONFIRMAÇÃO FINAL -->
 <div id="modalConfirmacao" class="modal">
     <div class="modal-content">
@@ -105,7 +128,16 @@
     </div>
 </div>
 
-<!-- MODAL: RECIBO DE SUCESSO -->
+<!-- MODAL: RECIBO DE SUCESSO (Agora está de volta!) -->
+<div id="modalRecibo" class="modal">
+    <div class="modal-content">
+        <h2 style="color: #27ae60;">✅ Venda concluída com sucesso</h2>
+        <div id="conteudoRecibo" class="recibo"></div>
+        <button class="btn btn-vermelho" onclick="fecharReciboEVoltar()" style="margin-top: 20px; font-size: 20px; padding: 15px; width: 100%;">❌ FECHAR</button>
+    </div>
+</div>
+
+<!-- MODAL: VENDAS DE HOJE (ÚLTIMAS VENDAS) -->
 <div id="modalVendasDia" class="modal">
     <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
         <h2>🧾 Vendas de Hoje</h2>
@@ -216,14 +248,18 @@
         if(carrinho.length === 0) return alert("❌ Carrinho vazio!");
         formaPagamentoAtual = forma;
         
-        if(forma === 'DINHEIRO') {
-            let total = carrinho.reduce((acc, item) => acc + (item.produto.preco * item.quantidade), 0);
+        let total = carrinho.reduce((acc, item) => acc + (item.produto.preco * item.quantidade), 0);
+
+        if (forma === 'DINHEIRO') {
             document.getElementById('totalDinheiro').innerText = total.toFixed(2);
             document.getElementById('valorRecebido').value = '';
             document.getElementById('valorTroco').innerText = "0.00";
             document.getElementById('btnAvancarDinheiro').disabled = true;
             document.getElementById('modalDinheiro').style.display = "block";
             setTimeout(() => document.getElementById('valorRecebido').focus(), 100);
+        } else if (forma === 'PIX') {
+            document.getElementById('totalPix').innerText = total.toFixed(2);
+            document.getElementById('modalPix').style.display = "block";
         } else {
             abrirConfirmacao(forma);
         }
@@ -248,12 +284,14 @@
 
     function abrirConfirmacao(forma) {
         document.getElementById('modalDinheiro').style.display = "none";
+        document.getElementById('modalPix').style.display = "none";
         document.getElementById('formaPagamentoDisplay').innerText = forma;
         document.getElementById('modalConfirmacao').style.display = "block";
     }
 
     function fecharModais() { 
         document.getElementById('modalDinheiro').style.display = "none";
+        document.getElementById('modalPix').style.display = "none";
         document.getElementById('modalConfirmacao').style.display = "none";
         document.getElementById('modalRecibo').style.display = "none";
         if(document.getElementById('modalVendasDia')) document.getElementById('modalVendasDia').style.display = "none";
