@@ -1,1 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha Loja - Câmera Direta</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
+        header { background-color: #2c3e50; color: white; padding: 10px; text-align: center; }
+        nav { display: flex; justify-content: center; background-color: #34495e; }
+        nav button { background-color: inherit; color: white; border: none; padding: 15px; cursor: pointer; font-size: 18px; font-weight: bold;}
+        .container { padding: 20px; max-width: 900px; margin: auto; }
+        .tab-content { display: none; background: white; padding: 20px; border-radius: 5px; }
+        .active { display: block; }
+        input { padding: 15px; margin: 10px 0; width: 100%; box-sizing: border-box; font-size: 18px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 18px; }
+        table, th, td { border: 1px solid #ddd; }
+        th, td { padding: 15px; text-align: left; }
+        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; cursor: pointer; font-size: 20px; font-weight: bold; color: white; width: 100%; }
+        .btn-verde { background-color: #27ae60; }
+        .btn-vermelho { background-color: #e74c3c; }
+        .btn-azul { background-color: #2980b9; }
+        .btn-amarelo { background-color: #f39c12; }
+        
+        /* Estilo da Câmera em Tela Cheia */
+        .camera-overlay { display: none; flex-direction: column; background: black; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; justify-content: center; align-items: center; }
+        #reader { width: 90%; max-width: 500px; border-radius: 10px; overflow: hidden; }
+        .fechar-camera { position: absolute; top: 20px; right: 20px; font-size: 30px; background: red; color: white; border: none; border-radius: 50%; width: 60px; height: 60px; cursor: pointer; font-weight: bold; }
+        /* Novos estilos para o Caixa */
+        .foto-produto { width: 50px; height: 50px; background-color: #ddd; display: inline-flex; justify-content: center; align-items: center; border-radius: 5px; font-size: 24px; }
+        .input-qtd { width: 60px; text-align: center; font-size: 20px; font-weight: bold; border: 2px solid #ccc; border-radius: 5px; padding: 5px; margin: 0 5px; }
+        .btn-remover { background-color: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 18px; font-weight: bold; }
+        .rodape-caixa { background-color: #ecf0f1; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center; }
+        .btn-pgto-caixa { font-size: 20px; padding: 20px; width: 31%; border-radius: 10px; cursor: pointer; border: none; color: white; font-weight: bold; margin-bottom: 10px; }
+       .recibo { text-align: left; background: #fff; padding: 15px; border: 1px dashed #333; font-family: monospace; font-size: 16px; margin-top: 15px; }
 
+        /* Faz os Modais (Pop-ups) ficarem escondidos até serem chamados */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 30px; border: 1px solid #888; width: 90%; max-width: 600px; border-radius: 10px; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body>
+
+<header><h1>Sistema da Loja</h1></header>
+
+<nav>
+    <button onclick="openTab('caixa')">🛒 CAIXA</button>
+    <button onclick="openTab('estoque')">📦 ESTOQUE</button>
+    <button onclick="openTab('relatorios')">📊 RELATÓRIOS</button>
+</nav>
+
+<div class="container">
+    <!-- CAIXA -->
+    <button class="btn btn-azul" onclick="iniciarCamera('caixa')" style="font-size: 24px; padding: 20px; margin-bottom: 15px;">📷 LER CÓDIGO (VENDER)</button>
+        <input type="text" id="codigoVenda" placeholder="Ou digite o código aqui..." onkeypress="verificarEnter(event)">
+        
+        <table id="tabelaCarrinho" style="border: none;">
+            <tbody id="listaCarrinho"></tbody>
+        </table>
+
+        <div class="rodape-caixa">
+            <h2 style="color: #27ae60; font-size: 30px; margin: 0 0 5px 0;">Valor total R$ <span id="totalVendaDisplay">0.00</span></h2>
+            <p style="font-size: 20px; font-weight: bold; margin: 0 0 20px 0; color: #7f8c8d;"><span id="qtdItensDisplay">0</span> Itens na sacola</p>
+            
+            <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+                <button class="btn-pgto-caixa bg-pix" onclick="iniciarPagamento('PIX')">💠 PIX</button>
+                <button class="btn-pgto-caixa bg-dinheiro" onclick="iniciarPagamento('DINHEIRO')">💵 DINHEIRO</button>
+                <button class="btn-pgto-caixa bg-cartao" onclick="iniciarPagamento('CARTÃO')">💳 CARTÃO</button>
+            </div>
+            
+            <button class="btn btn-vermelho" onclick="cancelarVenda()" style="margin-top: 15px; font-size: 18px;">❌ CANCELAR VENDA</button>
+        </div>
+    </div>
+
+    <!-- ESTOQUE -->
+    <div id="estoque" class="tab-content">
+        <button class="btn btn-amarelo" onclick="iniciarCamera('estoque')" style="font-size: 24px; padding: 20px;">📷 LER CÓDIGO (ESTOQUE)</button>
+        
+        <h2>Dados do Produto</h2>
+        <input type="text" id="cadCodigo" placeholder="Código de Barras">
+        <input type="text" id="cadNome" placeholder="Nome do Produto">
+        <input type="number" id="cadPreco" placeholder="Preço de Venda (R$)" step="0.01">
+        <input type="number" id="cadQuantidade" placeholder="Quantidade para Adicionar (+)" style="border: 3px solid #f39c12; font-weight: bold; font-size: 22px;">
+        <button class="btn btn-verde" onclick="salvarProduto()" style="font-size: 24px; padding: 20px;">✅ SALVAR NO ESTOQUE</button>
+        
+        <h3>Estoque Atual</h3>
+        <table id="tabelaEstoque">
+            <thead><tr><th>Nome</th><th>Qtd Total</th><th>Preço</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+<!-- ABA RELATÓRIOS -->
+    <div id="relatorios" class="tab-content">
+        <h2>Histórico de Vendas</h2>
+        <ul id="listaVendas" style="font-size: 20px;"></ul>
+    </div>
+</div>
+<!-- TELA DA CÂMERA (Fica escondida até clicar no botão) -->
+<div id="telaCamera" class="camera-overlay">
+    <button class="fechar-camera" onclick="fecharCamera()">X</button>
+    <div id="reader"></div>
+    <h2 style="color: white; margin-top: 20px;">Aponte para o código...</h2>
+</div>
+<div id="modalDinheiro" class="modal">
+    <div class="modal-content">
+        <h2>Dinheiro Recebido 💵</h2>
+        <p style="font-size: 24px;">Total da Compra: <b>R$ <span id="totalDinheiro">0.00</span></b></p>
+        <input type="number" id="valorRecebido" placeholder="Digite o valor recebido (R$)" step="0.01" oninput="calcularTroco()" style="font-size: 24px; text-align: center;">
+        <p style="font-size: 28px; color: #27ae60; font-weight: bold;">Troco: R$ <span id="valorTroco">0.00</span></p>
+        
+        <div style="display: flex; justify-content: space-around; margin-top: 30px;">
+            <button class="btn-gigante btn-vermelho" onclick="fecharModais()" style="font-size: 24px; padding: 20px;">❌ CORRIGIR</button>
+            <button class="btn-gigante btn-verde" onclick="abrirConfirmacao('DINHEIRO')" style="font-size: 24px; padding: 20px;" id="btnAvancarDinheiro" disabled>✅ AVANÇAR</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: CONFIRMAÇÃO FINAL -->
+<div id="modalConfirmacao" class="modal">
+    <div class="modal-content">
+        <h2>Finalizar compra?</h2>
+        <p style="font-size: 22px;">Pagamento via: <b id="formaPagamentoDisplay"></b></p>
+        <div style="display: flex; justify-content: space-around; margin-top: 30px;">
+            <button class="btn-gigante btn-vermelho" onclick="fecharModais()" style="font-size: 24px; padding: 20px;">❌ CORRIGIR</button>
+            <button class="btn-gigante btn-verde" onclick="finalizarVenda()" style="font-size: 24px; padding: 20px;">✅ SIM</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: RECIBO DE SUCESSO -->
+<div id="modalRecibo" class="modal">
+    <div class="modal-content">
+        <h2 style="color: #27ae60;">✅ Venda concluída com sucesso</h2>
+        <div id="conteudoRecibo" class="recibo"></div>
+        <button class="btn btn-vermelho" onclick="fecharReciboEVoltar()" style="margin-top: 20px; font-size: 20px; padding: 15px; width: auto;">❌ FECHAR</button>
+    </div>
+</div>
+
+
+<script>
+    let produtos = JSON.parse(localStorage.getItem('produtos')) || [];
+    let vendas = JSON.parse(localStorage.getItem('vendas')) || [];
+    let carrinho = [];
+    let formaPagamentoAtual = "";
+    let html5QrCode;
+    let destinoCamera = '';
+
+    function openTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.getElementById(tabName).classList.add('active');
+        atualizarTelas();
+    }
+
+    // --- NOVA LÓGICA DA CÂMERA DIRETA ---
+    function iniciarCamera(destino) {
+        destinoCamera = destino;
+        document.getElementById('telaCamera').style.display = 'flex';
+        
+        html5QrCode = new Html5Qrcode("reader");
+        // facingMode: "environment" força a câmera traseira do celular
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 150 } }, 
+            onScanSuccess
+        ).catch(err => {
+            alert("Erro ao abrir a câmera. Verifique as permissões.");
+            fecharCamera();
+        });
+    }
+
+    function fecharCamera() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+            }).catch(err => console.log(err));
+        }
+        document.getElementById('telaCamera').style.display = 'none';
+    }
+
+    function onScanSuccess(decodedText) {
+        fecharCamera(); // Fecha a câmera assim que lê
+        
+        if (destinoCamera === 'caixa') {
+            adicionarAoCarrinho(decodedText);
+        } else if (destinoCamera === 'estoque') {
+            preencherEstoque(decodedText);
+        }
+    }
+
+    // --- LÓGICA DO ESTOQUE INTELIGENTE ---
+function preencherEstoque(codigo) {
+        document.getElementById('cadCodigo').value = codigo;
+        let p = produtos.find(p => p.codigo === codigo);
+        
+        if (p) {
+            // Se já tem salvo no seu celular
+            document.getElementById('cadNome').value = p.nome;
+            document.getElementById('cadPreco').value = p.preco;
+            alert("✅ Produto encontrado no sistema! Digite a quantidade.");
+            document.getElementById('cadQuantidade').focus(); 
+        } else {
+            // Se não tem, busca na internet
+            document.getElementById('cadNome').value = "Buscando na internet...";
+            
+            fetch(`https://world.openfoodfacts.org/api/v0/product/${codigo}.json`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 1 && data.product.product_name) {
+                        document.getElementById('cadNome').value = data.product.product_name;
+                        alert("🌐 Produto encontrado na internet! Preencha o preço e a quantidade.");
+                    } else {
+                        document.getElementById('cadNome').value = '';
+                        alert("📦 Código novo! Preencha o nome manualmente.");
+                    }
+                    document.getElementById('cadPreco').focus();
+                })
+                .catch(err => {
+                    document.getElementById('cadNome').value = '';
+                    alert("📦 Falha na internet. Preencha manualmente.");
+                });
+        }
+        // Foca automaticamente no campo de quantidade
+        document.getElementById('cadQuantidade').focus(); 
+    }
+
+    function salvarProduto() {
+        let codigo = document.getElementById('cadCodigo').value;
+        let nome = document.getElementById('cadNome').value;
+        let preco = parseFloat(document.getElementById('cadPreco').value);
+        let qtdAdicionada = parseInt(document.getElementById('cadQuantidade').value) || 0;
+
+        if (!codigo || !nome || isNaN(preco)) return alert("Preencha Código, Nome e Preço!");
+
+        let produtoExistente = produtos.find(p => p.codigo === codigo);
+        
+        if (produtoExistente) {
+            // Se já existe, atualiza nome/preço e SOMA a quantidade
+            produtoExistente.nome = nome;
+            produtoExistente.preco = preco;
+            produtoExistente.quantidade = (produtoExistente.quantidade || 0) + qtdAdicionada;
+        } else {
+            // Se for novo, cria do zero
+            produtos.push({ codigo: codigo, nome: nome, preco: preco, quantidade: qtdAdicionada });
+        }
+
+        localStorage.setItem('produtos', JSON.stringify(produtos));
+        
+        // Limpa a tela para o próximo
+        document.getElementById('cadCodigo').value = '';
+        document.getElementById('cadNome').value = '';
+        document.getElementById('cadPreco').value = '';
+        document.getElementById('cadQuantidade').value = '';
+        atualizarTelas();
+    }
+
+    function atualizarTelas() {
+        let tbEstoque = document.querySelector('#tabelaEstoque tbody');
+        if (tbEstoque) {
+            tbEstoque.innerHTML = '';
+            produtos.forEach(p => {
+                let qtd = p.quantidade || 0;
+                tbEstoque.innerHTML += `<tr><td>${p.nome}</td><td style="font-weight:bold; font-size:22px;">${qtd}</td><td>R$ ${p.preco.toFixed(2)}</td></tr>`;
+            });
+        }
+
+        let listaVendas = document.getElementById('listaVendas');
+        if (listaVendas) {
+            listaVendas.innerHTML = '';
+            vendas.forEach(v => { 
+                listaVendas.innerHTML += `<li>${v.data} - Pagou no: <b>${v.pagamento}</b> - Valor: <b>R$ ${v.total.toFixed(2)}</b></li>`; 
+            });
+        }
+    }
+
+    // --- LÓGICA DO CAIXA ---
+    // --- CAIXA ---
+    function adicionarAoCarrinho(codigo) {
+        let produto = produtos.find(p => p.codigo === codigo);
+        if(produto) {
+            let item = carrinho.find(i => i.produto.codigo === codigo);
+            if (item) item.quantidade += 1;
+            else carrinho.push({ produto: produto, quantidade: 1 });
+            atualizarCarrinho();
+        } else alert("❌ Produto não cadastrado no sistema!");
+        document.getElementById('codigoVenda').focus();
+    }
+    function verificarEnter(event) { if (event.key === "Enter") { adicionarAoCarrinho(document.getElementById('codigoVenda').value); document.getElementById('codigoVenda').value = ''; } }
+    
+    function alterarQuantidade(index, valor) {
+        carrinho[index].quantidade += valor;
+        if(carrinho[index].quantidade <= 0) carrinho.splice(index, 1);
+        atualizarCarrinho();
+    }
+
+    function digitarQuantidade(index, input) {
+        let novaQtd = parseInt(input.value);
+        if (novaQtd > 0) carrinho[index].quantidade = novaQtd;
+        else carrinho.splice(index, 1);
+        atualizarCarrinho();
+    }
+
+    function removerItem(index) {
+        carrinho.splice(index, 1);
+        atualizarCarrinho();
+    }
+    
+    function atualizarCarrinho() {
+        let tbody = document.getElementById('listaCarrinho');
+        tbody.innerHTML = ''; 
+        let total = 0; let totalItens = 0;
+
+        carrinho.forEach((item, index) => {
+            let subtotal = item.produto.preco * item.quantidade;
+            total += subtotal; totalItens += item.quantidade;
+            tbody.innerHTML += `
+            <tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px 5px; width: 60px;"><div class="foto-produto">📦</div></td>
+                <td style="font-weight:bold; font-size: 18px;">${item.produto.nome}<br><span style="color: #7f8c8d; font-size: 14px;">R$ ${item.produto.preco.toFixed(2)}</span></td>
+                <td style="white-space: nowrap; text-align: center;">
+                    <button class="btn-qtd" onclick="alterarQuantidade(${index}, -1)">-</button>
+                    <input type="number" class="input-qtd" value="${item.quantidade}" onchange="digitarQuantidade(${index}, this)">
+                    <button class="btn-qtd" onclick="alterarQuantidade(${index}, 1)">+</button>
+                </td>
+                <td style="font-weight:bold; color: #27ae60; font-size: 18px; text-align: right;">R$ ${subtotal.toFixed(2)}<br>
+                <button class="btn-remover" onclick="removerItem(${index})" style="margin-top: 5px;">X</button></td>
+            </tr>`;
+        });
+        document.getElementById('totalVendaDisplay').innerText = total.toFixed(2);
+        document.getElementById('qtdItensDisplay').innerText = totalItens;
+        document.getElementById('codigoVenda').focus();
+    }
+    
+    function cancelarVenda() { carrinho = []; atualizarCarrinho(); document.getElementById('codigoVenda').focus(); }
+
+    // --- PAGAMENTOS E FIM ---
+    function iniciarPagamento(forma) {
+        if(carrinho.length === 0) return alert("❌ Carrinho vazio!");
+        formaPagamentoAtual = forma;
+        
+        if(forma === 'DINHEIRO') {
+            let total = carrinho.reduce((acc, item) => acc + (item.produto.preco * item.quantidade), 0);
+            document.getElementById('totalDinheiro').innerText = total.toFixed(2);
+            document.getElementById('valorRecebido').value = '';
+            document.getElementById('valorTroco').innerText = "0.00";
+            document.getElementById('btnAvancarDinheiro').disabled = true;
+            document.getElementById('modalDinheiro').style.display = "block";
+            setTimeout(() => document.getElementById('valorRecebido').focus(), 100);
+        } else {
+            abrirConfirmacao(forma);
+        }
+    }
+
+    function calcularTroco() {
+        let total = carrinho.reduce((acc, item) => acc + (item.produto.preco * item.quantidade), 0);
+        let recebido = parseFloat(document.getElementById('valorRecebido').value) || 0;
+        let troco = recebido - total;
+        let btnAvancar = document.getElementById('btnAvancarDinheiro');
+
+        if (troco >= 0 && recebido > 0) {
+            document.getElementById('valorTroco').innerText = troco.toFixed(2);
+            document.getElementById('valorTroco').style.color = "#27ae60";
+            btnAvancar.disabled = false;
+        } else {
+            document.getElementById('valorTroco').innerText = "Falta valor!";
+            document.getElementById('valorTroco').style.color = "#e74c3c";
+            btnAvancar.disabled = true;
+        }
+    }
+
+    function abrirConfirmacao(forma) {
+        document.getElementById('modalDinheiro').style.display = "none";
+        document.getElementById('formaPagamentoDisplay').innerText = forma;
+        document.getElementById('modalConfirmacao').style.display = "block";
+    }
+
+    function fecharModais() { 
+        document.getElementById('modalDinheiro').style.display = "none";
+        document.getElementById('modalConfirmacao').style.display = "none";
+        document.getElementById('modalRecibo').style.display = "none";
+        document.getElementById('codigoVenda').focus();
+        
+    }
+    function fecharReciboEVoltar() {
+        fecharModais(); // Esconde o pop-up
+        cancelarVenda(); // Zera o carrinho atual
+        atualizarTelas(); // Garante que tudo esteja atualizado
+        openTab('caixa'); // Garante que a tela inicial ativa seja o Caixa
+        document.getElementById('codigoVenda').focus(); // Foca no código de barras
+    }
+    function finalizarVenda() {
+        let total = carrinho.reduce((acc, item) => acc + (item.produto.preco * item.quantidade), 0);
+        let totalItens = carrinho.reduce((acc, item) => acc + item.quantidade, 0);
+        let dataAtual = new Date();
+        let dataFormatada = `${String(dataAtual.getDate()).padStart(2,'0')}/${String(dataAtual.getMonth()+1).padStart(2,'0')}/${dataAtual.getFullYear()}`;
+        let horaFormatada = `${String(dataAtual.getHours()).padStart(2,'0')}:${String(dataAtual.getMinutes()).padStart(2,'0')}h`;
+        let numDocumento = String(vendas.length + 1).padStart(7, '0');
+        
+        // Descontar do Estoque
+        carrinho.forEach(itemVendido => {
+            let prodEstoque = produtos.find(p => p.codigo === itemVendido.produto.codigo);
+            if(prodEstoque) prodEstoque.quantidade = (prodEstoque.quantidade || 0) - itemVendido.quantidade;
+        });
+        localStorage.setItem('produtos', JSON.stringify(produtos));
+
+        // Salvar Venda
+        vendas.push({ documento: numDocumento, data: dataFormatada, total: total, itens: totalItens, pagamento: formaPagamentoAtual, detalhes: carrinho.map(i => ({ nome: i.produto.nome, preco: i.produto.preco, qtd: i.quantidade })) });
+        localStorage.setItem('vendas', JSON.stringify(vendas));
+        
+        // Montar Recibo
+        let recibo = `<p><b>Documento N:</b> ${numDocumento} - ${dataFormatada} - ${horaFormatada}</p><hr><p><b>Itens:</b></p>`;
+        carrinho.forEach(i => recibo += `<p>${i.produto.nome} - R$ ${i.produto.preco.toFixed(2)} - ${i.quantidade}x</p>`);
+        recibo += `<hr><p><b>Valor total:</b> R$ ${total.toFixed(2)}<br><b>Pago através de:</b> ${formaPagamentoAtual}</p>`;
+        
+        document.getElementById('conteudoRecibo').innerHTML = recibo;
+        document.getElementById('modalConfirmacao').style.display = "none";
+        document.getElementById('modalRecibo').style.display = "block";
+    }
+
+    // Inicia a tela atualizando estoques
+    atualizarTelas();
+</script>
+
+</body>
+</html>
