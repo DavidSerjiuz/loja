@@ -50,8 +50,9 @@
 </nav>
 
 <div class="container">
-    <!-- CAIXA -->
-    <button class="btn btn-azul" onclick="iniciarCamera('caixa')" style="font-size: 24px; padding: 20px; margin-bottom: 15px;">📷 LER CÓDIGO (VENDER)</button>
+    <!-- ABA CAIXA (VENDAS) -->
+    <div id="caixa" class="tab-content active">
+        <button class="btn btn-azul" onclick="iniciarCamera()" style="font-size: 24px; padding: 20px; margin-bottom: 15px;">📷 LER CÓDIGO (VENDER)</button>
         <input type="text" id="codigoVenda" placeholder="Ou digite o código aqui..." onkeypress="verificarEnter(event)">
         
         <table id="tabelaCarrinho" style="border: none;">
@@ -70,30 +71,6 @@
             
             <button class="btn btn-vermelho" onclick="cancelarVenda()" style="margin-top: 15px; font-size: 18px;">❌ CANCELAR VENDA</button>
         </div>
-    </div>
-
-    <!-- ESTOQUE -->
-    <div id="estoque" class="tab-content">
-        <button class="btn btn-amarelo" onclick="iniciarCamera('estoque')" style="font-size: 24px; padding: 20px;">📷 LER CÓDIGO (ESTOQUE)</button>
-        
-        <h2>Dados do Produto</h2>
-        <input type="text" id="cadCodigo" placeholder="Código de Barras">
-        <input type="text" id="cadNome" placeholder="Nome do Produto">
-        <input type="number" id="cadPreco" placeholder="Preço de Venda (R$)" step="0.01">
-        <input type="number" id="cadQuantidade" placeholder="Quantidade para Adicionar (+)" style="border: 3px solid #f39c12; font-weight: bold; font-size: 22px;">
-        <button class="btn btn-verde" onclick="salvarProduto()" style="font-size: 24px; padding: 20px;">✅ SALVAR NO ESTOQUE</button>
-        
-        <h3>Estoque Atual</h3>
-        <table id="tabelaEstoque">
-            <thead><tr><th>Nome</th><th>Qtd Total</th><th>Preço</th></tr></thead>
-            <tbody></tbody>
-        </table>
-    </div>
-</div>
-<!-- ABA RELATÓRIOS -->
-    <div id="relatorios" class="tab-content">
-        <h2>Histórico de Vendas</h2>
-        <ul id="listaVendas" style="font-size: 20px;"></ul>
     </div>
 </div>
 <!-- TELA DA CÂMERA (Fica escondida até clicar no botão) -->
@@ -139,152 +116,53 @@
 
 
 <script>
+    // Carrega o banco de dados
     let produtos = JSON.parse(localStorage.getItem('produtos')) || [];
     let vendas = JSON.parse(localStorage.getItem('vendas')) || [];
     let carrinho = [];
     let formaPagamentoAtual = "";
     let html5QrCode;
-    let destinoCamera = '';
 
     function openTab(tabName) {
         document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-        document.getElementById(tabName).classList.add('active');
-        atualizarTelas();
+        let aba = document.getElementById(tabName);
+        if(aba) aba.classList.add('active');
     }
 
-    // --- NOVA LÓGICA DA CÂMERA DIRETA ---
-    function iniciarCamera(destino) {
-        destinoCamera = destino;
+    // --- CÂMERA DO CAIXA ---
+    function iniciarCamera() {
         document.getElementById('telaCamera').style.display = 'flex';
-        
         html5QrCode = new Html5Qrcode("reader");
-        // facingMode: "environment" força a câmera traseira do celular
         html5QrCode.start(
-            { facingMode: "environment" }, 
-            { fps: 10, qrbox: { width: 250, height: 150 } }, 
-            onScanSuccess
-        ).catch(err => {
-            alert("Erro ao abrir a câmera. Verifique as permissões.");
-            fecharCamera();
-        });
+            { facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onScanSuccess
+        ).catch(err => { alert("Erro ao abrir a câmera."); fecharCamera(); });
     }
-
     function fecharCamera() {
-        if (html5QrCode) {
-            html5QrCode.stop().then(() => {
-                html5QrCode.clear();
-            }).catch(err => console.log(err));
-        }
+        if (html5QrCode) html5QrCode.stop().then(() => html5QrCode.clear()).catch(err => console.log(err));
         document.getElementById('telaCamera').style.display = 'none';
+        document.getElementById('codigoVenda').focus();
     }
-
     function onScanSuccess(decodedText) {
-        fecharCamera(); // Fecha a câmera assim que lê
-        
-        if (destinoCamera === 'caixa') {
-            adicionarAoCarrinho(decodedText);
-        } else if (destinoCamera === 'estoque') {
-            preencherEstoque(decodedText);
-        }
+        fecharCamera();
+        adicionarAoCarrinho(decodedText);
     }
 
-    // --- LÓGICA DO ESTOQUE INTELIGENTE ---
-function preencherEstoque(codigo) {
-        document.getElementById('cadCodigo').value = codigo;
-        let p = produtos.find(p => p.codigo === codigo);
-        
-        if (p) {
-            // Se já tem salvo no seu celular
-            document.getElementById('cadNome').value = p.nome;
-            document.getElementById('cadPreco').value = p.preco;
-            alert("✅ Produto encontrado no sistema! Digite a quantidade.");
-            document.getElementById('cadQuantidade').focus(); 
-        } else {
-            // Se não tem, busca na internet
-            document.getElementById('cadNome').value = "Buscando na internet...";
-            
-            fetch(`https://world.openfoodfacts.org/api/v0/product/${codigo}.json`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 1 && data.product.product_name) {
-                        document.getElementById('cadNome').value = data.product.product_name;
-                        alert("🌐 Produto encontrado na internet! Preencha o preço e a quantidade.");
-                    } else {
-                        document.getElementById('cadNome').value = '';
-                        alert("📦 Código novo! Preencha o nome manualmente.");
-                    }
-                    document.getElementById('cadPreco').focus();
-                })
-                .catch(err => {
-                    document.getElementById('cadNome').value = '';
-                    alert("📦 Falha na internet. Preencha manualmente.");
-                });
-        }
-        // Foca automaticamente no campo de quantidade
-        document.getElementById('cadQuantidade').focus(); 
-    }
-
-    function salvarProduto() {
-        let codigo = document.getElementById('cadCodigo').value;
-        let nome = document.getElementById('cadNome').value;
-        let preco = parseFloat(document.getElementById('cadPreco').value);
-        let qtdAdicionada = parseInt(document.getElementById('cadQuantidade').value) || 0;
-
-        if (!codigo || !nome || isNaN(preco)) return alert("Preencha Código, Nome e Preço!");
-
-        let produtoExistente = produtos.find(p => p.codigo === codigo);
-        
-        if (produtoExistente) {
-            // Se já existe, atualiza nome/preço e SOMA a quantidade
-            produtoExistente.nome = nome;
-            produtoExistente.preco = preco;
-            produtoExistente.quantidade = (produtoExistente.quantidade || 0) + qtdAdicionada;
-        } else {
-            // Se for novo, cria do zero
-            produtos.push({ codigo: codigo, nome: nome, preco: preco, quantidade: qtdAdicionada });
-        }
-
-        localStorage.setItem('produtos', JSON.stringify(produtos));
-        
-        // Limpa a tela para o próximo
-        document.getElementById('cadCodigo').value = '';
-        document.getElementById('cadNome').value = '';
-        document.getElementById('cadPreco').value = '';
-        document.getElementById('cadQuantidade').value = '';
-        atualizarTelas();
-    }
-
-    function atualizarTelas() {
-        let tbEstoque = document.querySelector('#tabelaEstoque tbody');
-        if (tbEstoque) {
-            tbEstoque.innerHTML = '';
-            produtos.forEach(p => {
-                let qtd = p.quantidade || 0;
-                tbEstoque.innerHTML += `<tr><td>${p.nome}</td><td style="font-weight:bold; font-size:22px;">${qtd}</td><td>R$ ${p.preco.toFixed(2)}</td></tr>`;
-            });
-        }
-
-        let listaVendas = document.getElementById('listaVendas');
-        if (listaVendas) {
-            listaVendas.innerHTML = '';
-            vendas.forEach(v => { 
-                listaVendas.innerHTML += `<li>${v.data} - Pagou no: <b>${v.pagamento}</b> - Valor: <b>R$ ${v.total.toFixed(2)}</b></li>`; 
-            });
-        }
-    }
-
-    // --- LÓGICA DO CAIXA ---
-    // --- CAIXA ---
+    // --- CARRINHO E VENDAS ---
     function adicionarAoCarrinho(codigo) {
+        produtos = JSON.parse(localStorage.getItem('produtos')) || []; 
         let produto = produtos.find(p => p.codigo === codigo);
+        
         if(produto) {
             let item = carrinho.find(i => i.produto.codigo === codigo);
             if (item) item.quantidade += 1;
             else carrinho.push({ produto: produto, quantidade: 1 });
             atualizarCarrinho();
-        } else alert("❌ Produto não cadastrado no sistema!");
+        } else {
+            alert("❌ Produto não cadastrado no sistema!");
+        }
         document.getElementById('codigoVenda').focus();
     }
+    
     function verificarEnter(event) { if (event.key === "Enter") { adicionarAoCarrinho(document.getElementById('codigoVenda').value); document.getElementById('codigoVenda').value = ''; } }
     
     function alterarQuantidade(index, valor) {
@@ -333,7 +211,7 @@ function preencherEstoque(codigo) {
     
     function cancelarVenda() { carrinho = []; atualizarCarrinho(); document.getElementById('codigoVenda').focus(); }
 
-    // --- PAGAMENTOS E FIM ---
+    // --- PAGAMENTOS ---
     function iniciarPagamento(forma) {
         if(carrinho.length === 0) return alert("❌ Carrinho vazio!");
         formaPagamentoAtual = forma;
@@ -382,7 +260,52 @@ function preencherEstoque(codigo) {
         document.getElementById('codigoVenda').focus();
     }
 
+    function fecharReciboEVoltar() {
+        fecharModais();
+        cancelarVenda(); 
+    }
+
+    function finalizarVenda() {
+        let total = carrinho.reduce((acc, item) => acc + (item.produto.preco * item.quantidade), 0);
+        let totalItens = carrinho.reduce((acc, item) => acc + item.quantidade, 0);
+        let dataAtual = new Date();
+        let dataFormatada = `${String(dataAtual.getDate()).padStart(2,'0')}/${String(dataAtual.getMonth()+1).padStart(2,'0')}/${dataAtual.getFullYear()}`;
+        let horaFormatada = `${String(dataAtual.getHours()).padStart(2,'0')}:${String(dataAtual.getMinutes()).padStart(2,'0')}h`;
+        
+        vendas = JSON.parse(localStorage.getItem('vendas')) || [];
+        let numDocumento = String(vendas.length + 1).padStart(7, '0');
+        
+        produtos = JSON.parse(localStorage.getItem('produtos')) || [];
+        carrinho.forEach(itemVendido => {
+            let prodEstoque = produtos.find(p => p.codigo === itemVendido.produto.codigo);
+            if(prodEstoque) prodEstoque.quantidade = (prodEstoque.quantidade || 0) - itemVendido.quantidade;
+        });
+        localStorage.setItem('produtos', JSON.stringify(produtos));
+
+        let novaVenda = { 
+            documento: numDocumento, 
+            data: dataFormatada, 
+            hora: horaFormatada, 
+            total: total, 
+            itens: totalItens, 
+            pagamento: formaPagamentoAtual, 
+            detalhes: carrinho.map(i => ({ nome: i.produto.nome, preco: i.produto.preco, qtd: i.quantidade })) 
+        };
+        vendas.push(novaVenda);
+        localStorage.setItem('vendas', JSON.stringify(vendas));
+        
+        let recibo = `<p><b>Documento N:</b> ${numDocumento} - ${dataFormatada} - ${horaFormatada}</p><hr><p><b>Itens:</b></p>`;
+        carrinho.forEach(i => recibo += `<p>${i.produto.nome} - R$ ${i.produto.preco.toFixed(2)} - ${i.quantidade}x</p>`);
+        recibo += `<hr><p><b>Valor total:</b> R$ ${total.toFixed(2)}<br><b>Pago através de:</b> ${formaPagamentoAtual}</p>`;
+        
+        document.getElementById('conteudoRecibo').innerHTML = recibo;
+        document.getElementById('modalConfirmacao').style.display = "none";
+        document.getElementById('modalRecibo').style.display = "block";
+    }
+
+    // --- ÚLTIMAS VENDAS (SEGUNDA VIA) ---
     function abrirVendasDoDia() {
+        vendas = JSON.parse(localStorage.getItem('vendas')) || [];
         let dataAtual = new Date();
         let dataHoje = `${String(dataAtual.getDate()).padStart(2,'0')}/${String(dataAtual.getMonth()+1).padStart(2,'0')}/${dataAtual.getFullYear()}`;
         
@@ -400,7 +323,7 @@ function preencherEstoque(codigo) {
                 listaUI.innerHTML += `
                 <li style="border-bottom: 1px solid #ddd; padding: 10px 0; list-style: none;">
                     <b>Doc:</b> ${v.documento} <br>
-                    <b>Horário:</b> ${v.data} <br>
+                    <b>Horário:</b> ${v.hora || v.data} <br>
                     <b>Valor:</b> R$ ${v.total.toFixed(2)} (${v.pagamento})<br>
                     <button class="btn btn-azul" onclick="reimprimirRecibo(${originalIndex})" style="font-size: 16px; padding: 10px; margin-top: 5px; width: 100%;">🖨️ Ver Recibo (2ª Via)</button>
                 </li>`;
@@ -420,46 +343,6 @@ function preencherEstoque(codigo) {
         document.getElementById('conteudoRecibo').innerHTML = recibo;
         document.getElementById('modalRecibo').style.display = "block";
     }
-        
-    }
-    function fecharReciboEVoltar() {
-        fecharModais(); // Esconde o pop-up
-        cancelarVenda(); // Zera o carrinho atual
-        atualizarTelas(); // Garante que tudo esteja atualizado
-        openTab('caixa'); // Garante que a tela inicial ativa seja o Caixa
-        document.getElementById('codigoVenda').focus(); // Foca no código de barras
-    }
-    function finalizarVenda() {
-        let total = carrinho.reduce((acc, item) => acc + (item.produto.preco * item.quantidade), 0);
-        let totalItens = carrinho.reduce((acc, item) => acc + item.quantidade, 0);
-        let dataAtual = new Date();
-        let dataFormatada = `${String(dataAtual.getDate()).padStart(2,'0')}/${String(dataAtual.getMonth()+1).padStart(2,'0')}/${dataAtual.getFullYear()}`;
-        let horaFormatada = `${String(dataAtual.getHours()).padStart(2,'0')}:${String(dataAtual.getMinutes()).padStart(2,'0')}h`;
-        let numDocumento = String(vendas.length + 1).padStart(7, '0');
-        
-        // Descontar do Estoque
-        carrinho.forEach(itemVendido => {
-            let prodEstoque = produtos.find(p => p.codigo === itemVendido.produto.codigo);
-            if(prodEstoque) prodEstoque.quantidade = (prodEstoque.quantidade || 0) - itemVendido.quantidade;
-        });
-        localStorage.setItem('produtos', JSON.stringify(produtos));
-
-        // Salvar Venda
-        vendas.push({ documento: numDocumento, data: dataFormatada, total: total, itens: totalItens, pagamento: formaPagamentoAtual, detalhes: carrinho.map(i => ({ nome: i.produto.nome, preco: i.produto.preco, qtd: i.quantidade })) });
-        localStorage.setItem('vendas', JSON.stringify(vendas));
-        
-        // Montar Recibo
-        let recibo = `<p><b>Documento N:</b> ${numDocumento} - ${dataFormatada} - ${horaFormatada}</p><hr><p><b>Itens:</b></p>`;
-        carrinho.forEach(i => recibo += `<p>${i.produto.nome} - R$ ${i.produto.preco.toFixed(2)} - ${i.quantidade}x</p>`);
-        recibo += `<hr><p><b>Valor total:</b> R$ ${total.toFixed(2)}<br><b>Pago através de:</b> ${formaPagamentoAtual}</p>`;
-        
-        document.getElementById('conteudoRecibo').innerHTML = recibo;
-        document.getElementById('modalConfirmacao').style.display = "none";
-        document.getElementById('modalRecibo').style.display = "block";
-    }
-
-    // Inicia a tela atualizando estoques
-    atualizarTelas();
 </script>
 
 </body>
