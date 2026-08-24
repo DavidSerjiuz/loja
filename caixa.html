@@ -153,6 +153,8 @@
     let vendas = JSON.parse(localStorage.getItem('vendas')) || [];
     let carrinho = [];
     let formaPagamentoAtual = "";
+    let valorRecebidoAtual = 0;
+    let valorTrocoAtual = 0;
     let html5QrCode;
 
     function openTab(tabName) {
@@ -275,10 +277,17 @@
             document.getElementById('valorTroco').innerText = troco.toFixed(2);
             document.getElementById('valorTroco').style.color = "#27ae60";
             btnAvancar.disabled = false;
+            
+            // Grava os valores para usar no recibo depois
+            valorRecebidoAtual = recebido;
+            valorTrocoAtual = troco;
         } else {
             document.getElementById('valorTroco').innerText = "Falta valor!";
             document.getElementById('valorTroco').style.color = "#e74c3c";
             btnAvancar.disabled = true;
+            
+            valorRecebidoAtual = 0;
+            valorTrocoAtual = 0;
         }
     }
 
@@ -326,7 +335,9 @@
             hora: horaFormatada, 
             total: total, 
             itens: totalItens, 
-            pagamento: formaPagamentoAtual, 
+            pagamento: formaPagamentoAtual,
+            valorRecebido: (formaPagamentoAtual === 'DINHEIRO') ? valorRecebidoAtual : total,
+            troco: (formaPagamentoAtual === 'DINHEIRO') ? valorTrocoAtual : 0,
             detalhes: carrinho.map(i => ({ nome: i.produto.nome, preco: i.produto.preco, qtd: i.quantidade })) 
         };
         vendas.push(novaVenda);
@@ -335,6 +346,11 @@
         let recibo = `<p><b>Documento N:</b> ${numDocumento} - ${dataFormatada} - ${horaFormatada}</p><hr><p><b>Itens:</b></p>`;
         carrinho.forEach(i => recibo += `<p>${i.produto.nome} - R$ ${i.produto.preco.toFixed(2)} - ${i.quantidade}x</p>`);
         recibo += `<hr><p><b>Valor total:</b> R$ ${total.toFixed(2)}<br><b>Pago através de:</b> ${formaPagamentoAtual}</p>`;
+        
+        // Adiciona a área de Troco no recibo se for Dinheiro
+        if (formaPagamentoAtual === 'DINHEIRO') {
+            recibo += `<p><b>Dinheiro Recebido:</b> R$ ${valorRecebidoAtual.toFixed(2)}<br><b>Troco Devolvido:</b> R$ ${valorTrocoAtual.toFixed(2)}</p>`;
+        }
         
         document.getElementById('conteudoRecibo').innerHTML = recibo;
         document.getElementById('modalConfirmacao').style.display = "none";
@@ -375,8 +391,23 @@
         document.getElementById('modalVendasDia').style.display = "none";
         
         let recibo = `<p><b>Documento N:</b> ${v.documento} - ${v.data} <br><b>(2ª Via)</b></p><hr><p><b>Itens:</b></p>`;
-        v.detalhes.forEach(i => recibo += `<p>${i.nome} - R$ ${i.preco.toFixed(2)} - ${i.qtd}x</p>`);
+        
+        // Proteção contra vendas antigas (testes) que não tinham itens salvos
+        let itens = v.detalhes || [];
+        if(itens.length > 0) {
+            itens.forEach(i => recibo += `<p>${i.nome} - R$ ${i.preco.toFixed(2)} - ${i.qtd}x</p>`);
+        } else {
+            recibo += `<p><i>Itens não detalhados neste registro antigo</i></p>`;
+        }
+        
         recibo += `<hr><p><b>Valor total:</b> R$ ${v.total.toFixed(2)}<br><b>Pago através de:</b> ${v.pagamento}</p>`;
+        
+        // Puxa o troco caso seja uma venda nova em dinheiro
+        if (v.pagamento === 'DINHEIRO') {
+            let recebido = v.valorRecebido !== undefined ? v.valorRecebido : v.total;
+            let troco = v.troco !== undefined ? v.troco : 0;
+            recibo += `<p><b>Dinheiro Recebido:</b> R$ ${recebido.toFixed(2)}<br><b>Troco Devolvido:</b> R$ ${troco.toFixed(2)}</p>`;
+        }
         
         document.getElementById('conteudoRecibo').innerHTML = recibo;
         document.getElementById('modalRecibo').style.display = "block";
