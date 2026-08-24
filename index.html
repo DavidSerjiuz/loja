@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minha Loja - Câmera Integrada</title>
-    <!-- Importando a inteligência de leitura de código de barras -->
+    <title>Minha Loja - Câmera Direta</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
-        /* Mantemos o mesmo estilo acessível da versão anterior */
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
         header { background-color: #2c3e50; color: white; padding: 10px; text-align: center; }
         nav { display: flex; justify-content: center; background-color: #34495e; }
@@ -19,18 +17,21 @@
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 18px; }
         table, th, td { border: 1px solid #ddd; }
         th, td { padding: 15px; text-align: left; }
-        
         .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; cursor: pointer; font-size: 20px; font-weight: bold; color: white; width: 100%; }
         .btn-verde { background-color: #27ae60; }
         .btn-vermelho { background-color: #e74c3c; }
         .btn-azul { background-color: #2980b9; }
+        .btn-amarelo { background-color: #f39c12; }
         
-        #reader { width: 100%; margin-top: 10px; display: none; } /* Esconde a câmera inicialmente */
+        /* Estilo da Câmera em Tela Cheia */
+        .camera-overlay { display: none; flex-direction: column; background: black; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; justify-content: center; align-items: center; }
+        #reader { width: 90%; max-width: 500px; border-radius: 10px; overflow: hidden; }
+        .fechar-camera { position: absolute; top: 20px; right: 20px; font-size: 30px; background: red; color: white; border: none; border-radius: 50%; width: 60px; height: 60px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<header><h1>Caixa Rápido</h1></header>
+<header><h1>Sistema da Loja</h1></header>
 
 <nav>
     <button onclick="openTab('caixa')">🛒 CAIXA</button>
@@ -40,58 +41,161 @@
 <div class="container">
     <!-- CAIXA -->
     <div id="caixa" class="tab-content active">
-        <button class="btn btn-azul" onclick="iniciarCamera()" style="font-size: 24px; padding: 20px;">📷 ABRIR CÂMERA</button>
-        <div id="reader"></div> <!-- A imagem da câmera aparece aqui -->
-
+        <button class="btn btn-azul" onclick="iniciarCamera('caixa')" style="font-size: 24px; padding: 20px;">📷 LER CÓDIGO (VENDER)</button>
         <input type="text" id="codigoVenda" placeholder="Ou digite o código aqui..." onkeypress="verificarEnter(event)">
         
         <table id="tabelaCarrinho">
-            <thead><tr><th>Produto</th><th>Valor Un.</th><th>Total</th></tr></thead>
+            <thead><tr><th>Produto</th><th>Valor Un.</th><th>Qtd</th><th>Total</th></tr></thead>
             <tbody></tbody>
         </table>
-        <h2 style="color: #27ae60;">TOTAL: R$ <span id="totalVendaDisplay">0.00</span></h2>
-        
-        <button class="btn btn-verde" onclick="alert('Sistema de pagamento em breve!')">✅ FINALIZAR VENDA</button>
+        <h2 style="color: #27ae60; font-size: 30px;">TOTAL: R$ <span id="totalVendaDisplay">0.00</span></h2>
     </div>
 
-    <!-- ESTOQUE (Simplificado para o teste) -->
+    <!-- ESTOQUE -->
     <div id="estoque" class="tab-content">
-        <h2>Cadastrar Produto Teste</h2>
+        <button class="btn btn-amarelo" onclick="iniciarCamera('estoque')" style="font-size: 24px; padding: 20px;">📷 LER CÓDIGO (ESTOQUE)</button>
+        
+        <h2>Dados do Produto</h2>
         <input type="text" id="cadCodigo" placeholder="Código de Barras">
         <input type="text" id="cadNome" placeholder="Nome do Produto">
-        <input type="number" id="cadPreco" placeholder="Preço (R$)" step="0.01">
-        <button class="btn btn-verde" onclick="salvarProduto()">Salvar Produto</button>
+        <input type="number" id="cadPreco" placeholder="Preço de Venda (R$)" step="0.01">
+        <input type="number" id="cadQuantidade" placeholder="Quantidade para Adicionar (+)" style="border: 3px solid #f39c12; font-weight: bold; font-size: 22px;">
+        <button class="btn btn-verde" onclick="salvarProduto()" style="font-size: 24px; padding: 20px;">✅ SALVAR NO ESTOQUE</button>
+        
+        <h3>Estoque Atual</h3>
+        <table id="tabelaEstoque">
+            <thead><tr><th>Nome</th><th>Qtd Total</th><th>Preço</th></tr></thead>
+            <tbody></tbody>
+        </table>
     </div>
+</div>
+
+<!-- TELA DA CÂMERA (Fica escondida até clicar no botão) -->
+<div id="telaCamera" class="camera-overlay">
+    <button class="fechar-camera" onclick="fecharCamera()">X</button>
+    <div id="reader"></div>
+    <h2 style="color: white; margin-top: 20px;">Aponte para o código...</h2>
 </div>
 
 <script>
     let produtos = JSON.parse(localStorage.getItem('produtos')) || [];
-    let html5QrcodeScanner;
+    let carrinho = [];
+    let html5QrCode;
+    let destinoCamera = '';
 
     function openTab(tabName) {
         document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
         document.getElementById(tabName).classList.add('active');
+        atualizarTabelaEstoque();
+    }
+
+    // --- NOVA LÓGICA DA CÂMERA DIRETA ---
+    function iniciarCamera(destino) {
+        destinoCamera = destino;
+        document.getElementById('telaCamera').style.display = 'flex';
+        
+        html5QrCode = new Html5Qrcode("reader");
+        // facingMode: "environment" força a câmera traseira do celular
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 150 } }, 
+            onScanSuccess
+        ).catch(err => {
+            alert("Erro ao abrir a câmera. Verifique as permissões.");
+            fecharCamera();
+        });
+    }
+
+    function fecharCamera() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+            }).catch(err => console.log(err));
+        }
+        document.getElementById('telaCamera').style.display = 'none';
+    }
+
+    function onScanSuccess(decodedText) {
+        fecharCamera(); // Fecha a câmera assim que lê
+        
+        if (destinoCamera === 'caixa') {
+            adicionarAoCarrinho(decodedText);
+        } else if (destinoCamera === 'estoque') {
+            preencherEstoque(decodedText);
+        }
+    }
+
+    // --- LÓGICA DO ESTOQUE INTELIGENTE ---
+    function preencherEstoque(codigo) {
+        document.getElementById('cadCodigo').value = codigo;
+        let produtoExistente = produtos.find(p => p.codigo === codigo);
+        
+        if (produtoExistente) {
+            document.getElementById('cadNome').value = produtoExistente.nome;
+            document.getElementById('cadPreco').value = produtoExistente.preco;
+            alert(`✅ Produto encontrado! Digite apenas a quantidade que está entrando.`);
+        } else {
+            document.getElementById('cadNome').value = '';
+            document.getElementById('cadPreco').value = '';
+            alert(`📦 Código novo! Preencha o nome e o preço também.`);
+        }
+        // Foca automaticamente no campo de quantidade
+        document.getElementById('cadQuantidade').focus(); 
     }
 
     function salvarProduto() {
-        let prod = { 
-            codigo: document.getElementById('cadCodigo').value, 
-            nome: document.getElementById('cadNome').value, 
-            preco: parseFloat(document.getElementById('cadPreco').value) 
-        };
-        produtos.push(prod);
+        let codigo = document.getElementById('cadCodigo').value;
+        let nome = document.getElementById('cadNome').value;
+        let preco = parseFloat(document.getElementById('cadPreco').value);
+        let qtdAdicionada = parseInt(document.getElementById('cadQuantidade').value) || 0;
+
+        if (!codigo || !nome || isNaN(preco)) return alert("Preencha Código, Nome e Preço!");
+
+        let produtoExistente = produtos.find(p => p.codigo === codigo);
+        
+        if (produtoExistente) {
+            // Se já existe, atualiza nome/preço e SOMA a quantidade
+            produtoExistente.nome = nome;
+            produtoExistente.preco = preco;
+            produtoExistente.quantidade = (produtoExistente.quantidade || 0) + qtdAdicionada;
+        } else {
+            // Se for novo, cria do zero
+            produtos.push({ codigo: codigo, nome: nome, preco: preco, quantidade: qtdAdicionada });
+        }
+
         localStorage.setItem('produtos', JSON.stringify(produtos));
-        alert("Salvo!");
+        
+        // Limpa a tela para o próximo
+        document.getElementById('cadCodigo').value = '';
+        document.getElementById('cadNome').value = '';
+        document.getElementById('cadPreco').value = '';
+        document.getElementById('cadQuantidade').value = '';
+        
+        atualizarTabelaEstoque();
     }
 
-    function adicionarAoCarrinho(codigoLido) {
-        let produto = produtos.find(p => p.codigo === codigoLido);
+    function atualizarTabelaEstoque() {
+        let tbody = document.querySelector('#tabelaEstoque tbody');
+        tbody.innerHTML = '';
+        produtos.forEach(p => {
+            let qtd = p.quantidade || 0;
+            tbody.innerHTML += `<tr><td>${p.nome}</td><td style="font-weight:bold; font-size:22px;">${qtd}</td><td>R$ ${p.preco.toFixed(2)}</td></tr>`;
+        });
+    }
+
+    // --- LÓGICA DO CAIXA ---
+    function adicionarAoCarrinho(codigo) {
+        let produto = produtos.find(p => p.codigo === codigo);
         if(produto) {
-            let tbody = document.querySelector('#tabelaCarrinho tbody');
-            tbody.innerHTML += `<tr><td>${produto.nome}</td><td>R$ ${produto.preco}</td><td>R$ ${produto.preco}</td></tr>`;
-            alert("✅ " + produto.nome + " adicionado!");
+            let itemNoCarrinho = carrinho.find(i => i.codigo === codigo);
+            if (itemNoCarrinho) {
+                itemNoCarrinho.qtd += 1;
+            } else {
+                carrinho.push({ codigo: produto.codigo, nome: produto.nome, preco: produto.preco, qtd: 1 });
+            }
+            atualizarCarrinho();
         } else {
-            alert("❌ Produto não encontrado no estoque.");
+            alert("❌ Produto não cadastrado!");
         }
     }
 
@@ -102,31 +206,26 @@
         }
     }
 
-    // --- LÓGICA DA CÂMERA ---
-    function iniciarCamera() {
-        document.getElementById('reader').style.display = "block"; // Mostra o quadro
+    function atualizarCarrinho() {
+        let tbody = document.querySelector('#tabelaCarrinho tbody');
+        tbody.innerHTML = '';
+        let total = 0;
         
-        // Configura o leitor
-        html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 150} }, false);
-        
-        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        carrinho.forEach(item => {
+            let subtotal = item.preco * item.qtd;
+            total += subtotal;
+            tbody.innerHTML += `<tr>
+                <td style="font-weight:bold;">${item.nome}</td>
+                <td>R$ ${item.preco.toFixed(2)}</td>
+                <td style="font-weight:bold; text-align:center;">${item.qtd}</td>
+                <td style="color: #27ae60; font-weight:bold;">R$ ${subtotal.toFixed(2)}</td>
+            </tr>`;
+        });
+        document.getElementById('totalVendaDisplay').innerText = total.toFixed(2);
     }
 
-    function onScanSuccess(decodedText, decodedResult) {
-        // Quando a câmera consegue ler um código com sucesso
-        console.log(`Código lido: ${decodedText}`);
-        
-        // Pára a câmera para não ler duas vezes sem querer
-        html5QrcodeScanner.clear(); 
-        document.getElementById('reader').style.display = "none";
-        
-        // Joga o produto no carrinho
-        adicionarAoCarrinho(decodedText);
-    }
-
-    function onScanFailure(error) {
-        // Ignora erros normais de quando a câmera ainda está focando
-    }
+    // Inicia a tela atualizando estoques
+    atualizarTabelaEstoque();
 </script>
 
 </body>
