@@ -126,18 +126,36 @@
     }
 
     // --- LÓGICA DO ESTOQUE INTELIGENTE ---
-    function preencherEstoque(codigo) {
+function preencherEstoque(codigo) {
         document.getElementById('cadCodigo').value = codigo;
-        let produtoExistente = produtos.find(p => p.codigo === codigo);
+        let p = produtos.find(p => p.codigo === codigo);
         
-        if (produtoExistente) {
-            document.getElementById('cadNome').value = produtoExistente.nome;
-            document.getElementById('cadPreco').value = produtoExistente.preco;
-            alert(`✅ Produto encontrado! Digite apenas a quantidade que está entrando.`);
+        if (p) {
+            // Se já tem salvo no seu celular
+            document.getElementById('cadNome').value = p.nome;
+            document.getElementById('cadPreco').value = p.preco;
+            alert("✅ Produto encontrado no sistema! Digite a quantidade.");
+            document.getElementById('cadQuantidade').focus(); 
         } else {
-            document.getElementById('cadNome').value = '';
-            document.getElementById('cadPreco').value = '';
-            alert(`📦 Código novo! Preencha o nome e o preço também.`);
+            // Se não tem, busca na internet
+            document.getElementById('cadNome').value = "Buscando na internet...";
+            
+            fetch(`https://world.openfoodfacts.org/api/v0/product/${codigo}.json`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 1 && data.product.product_name) {
+                        document.getElementById('cadNome').value = data.product.product_name;
+                        alert("🌐 Produto encontrado na internet! Preencha o preço e a quantidade.");
+                    } else {
+                        document.getElementById('cadNome').value = '';
+                        alert("📦 Código novo! Preencha o nome manualmente.");
+                    }
+                    document.getElementById('cadPreco').focus();
+                })
+                .catch(err => {
+                    document.getElementById('cadNome').value = '';
+                    alert("📦 Falha na internet. Preencha manualmente.");
+                });
         }
         // Foca automaticamente no campo de quantidade
         document.getElementById('cadQuantidade').focus(); 
