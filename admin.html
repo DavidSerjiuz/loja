@@ -42,10 +42,9 @@
 </head>
 <body>
 
-<header><h1>Sistema da Loja</h1></header>
+<header><h1>Painel do Administrador</h1></header>
 
 <nav>
-    <button onclick="openTab('caixa')">🛒 CAIXA</button>
     <button onclick="openTab('estoque')">📦 ESTOQUE</button>
     <button onclick="openTab('relatorios')">📊 RELATÓRIOS</button>
 </nav>
@@ -74,8 +73,8 @@
     </div>
 
     <!-- ESTOQUE -->
-    <div id="estoque" class="tab-content">
-        <button class="btn btn-amarelo" onclick="iniciarCamera('estoque')" style="font-size: 24px; padding: 20px;">📷 LER CÓDIGO (ESTOQUE)</button>
+    <div id="estoque" class="tab-content active">
+        <button class="btn btn-amarelo" onclick="iniciarCamera('estoque')" style="font-size: 24px; padding: 20px; margin-bottom: 15px;">📷 LER CÓDIGO (ESTOQUE)</button>
         
         <h2>Dados do Produto</h2>
         <input type="text" id="cadCodigo" placeholder="Código de Barras">
