@@ -42,12 +42,11 @@
 </head>
 <body>
 
-<header><h1>Sistema da Loja</h1></header>
+<header><h1>Sistema de Caixa</h1></header>
 
 <nav>
     <button onclick="openTab('caixa')">🛒 CAIXA</button>
-    <button onclick="openTab('estoque')">📦 ESTOQUE</button>
-    <button onclick="openTab('relatorios')">📊 RELATÓRIOS</button>
+    <button onclick="abrirVendasDoDia()">🧾 ÚLTIMAS VENDAS</button>
 </nav>
 
 <div class="container">
@@ -130,11 +129,11 @@
 </div>
 
 <!-- MODAL: RECIBO DE SUCESSO -->
-<div id="modalRecibo" class="modal">
-    <div class="modal-content">
-        <h2 style="color: #27ae60;">✅ Venda concluída com sucesso</h2>
-        <div id="conteudoRecibo" class="recibo"></div>
-        <button class="btn btn-vermelho" onclick="fecharReciboEVoltar()" style="margin-top: 20px; font-size: 20px; padding: 15px; width: auto;">❌ FECHAR</button>
+<div id="modalVendasDia" class="modal">
+    <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
+        <h2>🧾 Vendas de Hoje</h2>
+        <ul id="listaVendasHoje" style="text-align: left; font-size: 18px; padding: 0;"></ul>
+        <button class="btn btn-vermelho" onclick="fecharModais()" style="margin-top: 20px; font-size: 20px; padding: 15px; width: 100%;">❌ FECHAR</button>
     </div>
 </div>
 
@@ -379,7 +378,48 @@ function preencherEstoque(codigo) {
         document.getElementById('modalDinheiro').style.display = "none";
         document.getElementById('modalConfirmacao').style.display = "none";
         document.getElementById('modalRecibo').style.display = "none";
+        if(document.getElementById('modalVendasDia')) document.getElementById('modalVendasDia').style.display = "none";
         document.getElementById('codigoVenda').focus();
+    }
+
+    function abrirVendasDoDia() {
+        let dataAtual = new Date();
+        let dataHoje = `${String(dataAtual.getDate()).padStart(2,'0')}/${String(dataAtual.getMonth()+1).padStart(2,'0')}/${dataAtual.getFullYear()}`;
+        
+        let listaUI = document.getElementById('listaVendasHoje');
+        listaUI.innerHTML = '';
+        
+        let vendasHoje = vendas.filter(v => v.data === dataHoje);
+        
+        if (vendasHoje.length === 0) {
+            listaUI.innerHTML = '<p style="text-align:center;">Nenhuma venda realizada hoje.</p>';
+        } else {
+            for (let i = vendasHoje.length - 1; i >= 0; i--) {
+                let v = vendasHoje[i];
+                let originalIndex = vendas.indexOf(v);
+                listaUI.innerHTML += `
+                <li style="border-bottom: 1px solid #ddd; padding: 10px 0; list-style: none;">
+                    <b>Doc:</b> ${v.documento} <br>
+                    <b>Horário:</b> ${v.data} <br>
+                    <b>Valor:</b> R$ ${v.total.toFixed(2)} (${v.pagamento})<br>
+                    <button class="btn btn-azul" onclick="reimprimirRecibo(${originalIndex})" style="font-size: 16px; padding: 10px; margin-top: 5px; width: 100%;">🖨️ Ver Recibo (2ª Via)</button>
+                </li>`;
+            }
+        }
+        document.getElementById('modalVendasDia').style.display = "block";
+    }
+
+    function reimprimirRecibo(index) {
+        let v = vendas[index];
+        document.getElementById('modalVendasDia').style.display = "none";
+        
+        let recibo = `<p><b>Documento N:</b> ${v.documento} - ${v.data} <br><b>(2ª Via)</b></p><hr><p><b>Itens:</b></p>`;
+        v.detalhes.forEach(i => recibo += `<p>${i.nome} - R$ ${i.preco.toFixed(2)} - ${i.qtd}x</p>`);
+        recibo += `<hr><p><b>Valor total:</b> R$ ${v.total.toFixed(2)}<br><b>Pago através de:</b> ${v.pagamento}</p>`;
+        
+        document.getElementById('conteudoRecibo').innerHTML = recibo;
+        document.getElementById('modalRecibo').style.display = "block";
+    }
         
     }
     function fecharReciboEVoltar() {
